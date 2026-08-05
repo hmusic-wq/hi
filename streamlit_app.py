@@ -2,7 +2,6 @@ import html
 import streamlit as st
 import streamlit.components.v1 as components
 
-
 # ============================================================
 # 定数定義
 # ============================================================
