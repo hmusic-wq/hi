@@ -125,67 +125,6 @@ def reset_progress():
     st.session_state.sender_port = DEFAULT_SENDER_PORT
     st.session_state.receiver_port = DEFAULT_RECEIVER_PORT
 
-import streamlit as st
-
-# ============================================================
-# 画面スクロール制御（st.markdown による直接スクロール処理）
-# ============================================================
-
-SCROLL_ANCHOR_ID = "protocolayer-top-anchor"
-
-
-def request_scroll_to_top():
-    st.session_state["_scroll_to_top"] = True
-
-
-def scroll_to_top():
-    # components.html ではなく st.markdown を使い、親DOMに直接干渉する
-    st.markdown(
-        f"""
-        <img src="x" onerror="
-            (function() {{
-                function forceScrollTop() {{
-                    // 1. アンカー要素へのスクロールを試行
-                    var anchor = document.getElementById('{SCROLL_ANCHOR_ID}');
-                    if (anchor) {{
-                        anchor.scrollIntoView({{ behavior: 'instant', block: 'start' }});
-                    }}
-                    
-                    # 2. 考えられるすべてのスクロール対象のscrollTopを強制的に0に指定
-                    window.scrollTo(0, 0);
-                    if (document.documentElement) document.documentElement.scrollTop = 0;
-                    if (document.body) document.body.scrollTop = 0;
-                    
-                    # 3. Streamlit固有の主要コンテナを全てリセット
-                    var selectors = [
-                        '[data-testid=\\"stAppViewContainer\\"]',
-                        '[data-testid=\\"stMain\\"]',
-                        'section.main',
-                        '.main'
-                    ];
-                    selectors.forEach(function(s) {{
-                        var els = document.querySelectorAll(s);
-                        els.forEach(function(el) {{
-                            el.scrollTop = 0;
-                        }});
-                    }});
-                }}
-
-                // 即時実行 + 描画完了を考慮して短時間連続実行
-                forceScrollTop();
-                var count = 0;
-                var timer = setInterval(function() {{
-                    forceScrollTop();
-                    count++;
-                    if (count >= 10) clearInterval(timer);
-                }}, 50);
-            }})();
-            this.remove();
-        " style="display:none;">
-        """,
-        unsafe_allow_html=True,
-    )
-
 # ============================================================
 # サイドバー
 # ============================================================
