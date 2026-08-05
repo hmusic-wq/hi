@@ -125,6 +125,44 @@ def reset_progress():
     st.session_state.sender_port = DEFAULT_SENDER_PORT
     st.session_state.receiver_port = DEFAULT_RECEIVER_PORT
 
+
+# ============================================================
+# 画面スクロール制御
+# ============================================================
+
+SCROLL_ANCHOR_ID = "protocolayer-top-anchor"
+
+
+def request_scroll_to_top():
+    st.session_state["_scroll_to_top"] = True
+
+
+def scroll_to_top():
+    components.html(
+        f"""
+        <script>
+            function scrollToAnchor() {{
+                try {{
+                    var doc = window.parent.document;
+                    var anchor = doc.getElementById("{SCROLL_ANCHOR_ID}");
+                    if (anchor) {{
+                        anchor.scrollIntoView({{ behavior: "auto", block: "start" }});
+                    }} else {{
+                        window.parent.scrollTo({{ top: 0, behavior: "auto" }});
+                    }}
+                }} catch (e) {{
+                    window.scrollTo({{ top: 0, behavior: "auto" }});
+                }}
+            }}
+            setTimeout(scrollToAnchor, 30);
+            setTimeout(scrollToAnchor, 120);
+            setTimeout(scrollToAnchor, 300);
+        </script>
+        """,
+        height=0,
+    )
+
+
 # ============================================================
 # サイドバー
 # ============================================================
