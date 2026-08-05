@@ -81,18 +81,18 @@ QUIZ_LAYER_JP = {
 
 STEP_MAX = 10
 
-# 各STEPのタイトルと、そのSTEPで強調する階層／通信経路上の位置
+# 各STEPのタイトルと、そのSTEPで強調する階層
 STEP_INFO = {
-    1: {"title": "STEP1　メール作成", "layer": None, "path": "sender"},
-    2: {"title": "STEP2　アプリケーション層", "layer": "app", "path": "sender"},
-    3: {"title": "STEP3　トランスポート層", "layer": "tcp", "path": "sender"},
-    4: {"title": "STEP4　インターネット層", "layer": "ip", "path": "sender"},
-    5: {"title": "STEP5　ネットワークインターフェース層", "layer": "ethernet", "path": "sender"},
-    6: {"title": "STEP6　インターネット通過", "layer": None, "path": "internet"},
-    7: {"title": "STEP7　ネットワークインターフェース層 除去", "layer": "ethernet", "path": "receiver"},
-    8: {"title": "STEP8　インターネット層 除去", "layer": "ip", "path": "receiver"},
-    9: {"title": "STEP9　トランスポート層 除去", "layer": "tcp", "path": "receiver"},
-    10: {"title": "STEP10　メール表示", "layer": "app", "path": "receiver"},
+    1: {"title": "STEP1　メール作成", "layer": None},
+    2: {"title": "STEP2　アプリケーション層", "layer": "app"},
+    3: {"title": "STEP3　トランスポート層", "layer": "tcp"},
+    4: {"title": "STEP4　インターネット層", "layer": "ip"},
+    5: {"title": "STEP5　ネットワークインターフェース層", "layer": "ethernet"},
+    6: {"title": "STEP6　インターネット通過", "layer": None},
+    7: {"title": "STEP7　ネットワークインターフェース層 除去", "layer": "ethernet"},
+    8: {"title": "STEP8　インターネット層 除去", "layer": "ip"},
+    9: {"title": "STEP9　トランスポート層 除去", "layer": "tcp"},
+    10: {"title": "STEP10　メール表示", "layer": "app"},
 }
 
 
@@ -240,64 +240,6 @@ def render_header():
 
 
 # ============================================================
-# 通信経路のイラスト表示
-# ============================================================
-
-def render_communication_path():
-    """送信者PC → LAN → ルータ → インターネット
-    を横に並べたイラストを表示する。現在のステップに応じて該当区間を強調する。
-    インターネット区間は常に色を変えて表示する。
-    """
-    active_path = STEP_INFO[st.session_state.step]["path"]
-
-    nodes = [
-        ("💻 送信者PC", "sender"),
-        ("🔌 LAN", "sender"),
-        ("📡 ルータ", "sender"),
-        ("🌐 インターネット", "internet"),
-    ]
-
-    boxes_html = []
-    for i, (label, owner) in enumerate(nodes):
-        is_internet = owner == "internet"
-        is_active = (owner == active_path)
-
-        if is_internet:
-            bg = "#7C3AED"       # インターネットは常に紫で目立たせる
-            text_color = "#FFFFFF"
-            border = "3px solid #4C1D95"
-        elif is_active:
-            bg = "#FEF08A"       # 現在アクティブな区間は黄色で強調
-            text_color = "#111827"
-            border = "3px solid #CA8A04"
-        else:
-            bg = "#F3F4F6"
-            text_color = "#374151"
-            border = "2px solid #D1D5DB"
-
-        box = f"""
-        <div style="background:{bg};color:{text_color};border:{border};
-                    border-radius:10px;padding:8px 6px;text-align:center;
-                    font-size:13px;font-weight:600;min-width:90px;">
-            {label}
-        </div>
-        """
-        boxes_html.append(box)
-        if i != len(nodes) - 1:
-            boxes_html.append(
-                '<div style="font-size:20px;color:#9CA3AF;">→</div>'
-            )
-
-    path_html = f"""
-    <div style="display:flex;align-items:center;justify-content:center;
-                gap:6px;flex-wrap:wrap;padding:12px 0;">
-        {''.join(boxes_html)}
-    </div>
-    """
-    st.markdown(path_html, unsafe_allow_html=True)
-
-
-# ============================================================
 # パケット構造（カプセル化）の表示
 # ============================================================
 
@@ -310,47 +252,47 @@ LAYER_TAB_LABEL = {
 }
 
 
-def _wrap_layer_box(inner_content_html, layer_key, header_line_html):
-    """1つの階層分の「封筒」を組み立てる。
-    外枠（border）を最後まで崩さず、その内側に
-    「◯◯層」のタイトルバー → ヘッダ情報 → 一つ内側の階層 の順に配置する。
-    box-sizing:border-box を指定した上で、内側の階層ほど
-    padding分だけ幅・高さが小さくなるため、
-    外側の枠を保ったまま四角が段々広がっていくように見える。
+def _build_layer_box(layer_key, header_line_html, body_html=None):
+    """1つの階層分を、独立した四角い箱として組み立てる。
+    上部に「◯◯層」のタイトルバー、その下にヘッダ情報（と、必要なら本文）を表示する。
+    この箱を縦に積み重ねることで、カプセル化・デカプセル化を表現する。
     """
     color = LAYER_COLOR[layer_key]
     bg = LAYER_BG[layer_key]
     tab_label = LAYER_TAB_LABEL[layer_key]
+    body = f'<div style="margin-top:8px;">{body_html}</div>' if body_html else ""
 
     return f"""
     <div style="box-sizing:border-box;border:3px solid {color};border-radius:12px;
-                background:{bg};margin-top:14px;overflow:hidden;">
+                background:{bg};overflow:hidden;">
         <div style="background:{color};color:#FFFFFF;font-size:11px;font-weight:800;
                     letter-spacing:1px;padding:4px 12px;">
             {tab_label}
         </div>
-        <div style="box-sizing:border-box;padding:12px 14px 14px 14px;">
-            <div style="font-size:12px;font-weight:700;color:{color};margin-bottom:8px;">
+        <div style="box-sizing:border-box;padding:10px 14px;">
+            <div style="font-size:12px;font-weight:700;color:{color};">
                 {header_line_html}
             </div>
-            {inner_content_html}
+            {body}
         </div>
     </div>
     """
 
 
 def render_packet_box(layers):
-    """packet_layers（内側から外側の順）を受け取り、
-    階層を重ねるごとに枠が外側へ広がっていく「封筒」のイメージで
-    ネストしたHTMLを組み立てて表示する。各層の先頭には
-    「◯◯層」という階層名を、その下に具体的なヘッダ情報を表示する。
+    """packet_layers（内側＝アプリケーション層から外側＝Ethernetの順）を受け取り、
+    階層ごとに独立した四角い箱として縦に積み上げて表示する。
+
+    ・カプセル化：新しい階層の箱が一番上に追加されていくイメージ
+    ・デカプセル化：一番上の箱から順に取り除かれていくイメージ
+
+    そのため、表示上は一番上＝最も外側（最後に追加された階層）、
+    一番下＝メール本体（アプリケーション層）となるように並べる。
     """
-    # ユーザー入力はHTMLとして解釈されないようエスケープしてから埋め込む
     safe_subject = html.escape(st.session_state.subject)
     safe_message = html.escape(st.session_state.message).replace("\n", "<br>")
 
-    # 一番内側（メール本体そのもの）
-    content = f"""
+    mail_body_html = f"""
     <div style="background:#FFFFFF;border:2px dashed #93C5FD;border-radius:8px;
                 padding:10px;font-size:13px;color:#1E3A8A;">
         ✉️ 件名：{safe_subject}<br>
@@ -358,35 +300,47 @@ def render_packet_box(layers):
     </div>
     """
 
-    # 内側から外側へ、階層を1つずつ重ねて包んでいく
-    for layer in layers:
+    boxes_html = []
+    # layers は内側(app)→外側(ethernet)の順で格納されているため、
+    # 「外側＝上」の積み上げ表示にするために反転させてから処理する
+    for layer in reversed(layers):
         if layer == "app":
-            header_line = "✉️ メール"
+            header_line = "✉️ メール（アプリケーション層）"
+            boxes_html.append(_build_layer_box("app", header_line, mail_body_html))
         elif layer == "tcp":
             header_line = (
                 f"🟩 TCPヘッダ（送信元Port:{html.escape(str(st.session_state.sender_port))} "
                 f"/ 宛先Port:{html.escape(str(st.session_state.receiver_port))}）"
             )
+            boxes_html.append(_build_layer_box("tcp", header_line))
         elif layer == "ip":
             header_line = (
                 f"🟧 IPヘッダ（送信元IP:{html.escape(st.session_state.sender_ip)} "
                 f"/ 宛先IP:{html.escape(st.session_state.receiver_ip)} "
                 f"/ TTL:{st.session_state.ttl}）"
             )
+            boxes_html.append(_build_layer_box("ip", header_line))
         elif layer == "ethernet":
             header_line = (
                 f"🟥 Ethernetヘッダ（送信元MAC:{html.escape(st.session_state.sender_mac)} "
                 f"/ 宛先MAC:{html.escape(st.session_state.receiver_mac)}）"
             )
-        else:
-            continue
+            boxes_html.append(_build_layer_box("ethernet", header_line))
 
-        content = _wrap_layer_box(content, layer, header_line)
-
-    st.markdown(
-        f'<div style="max-width:560px;margin:0 auto;">{content}</div>',
-        unsafe_allow_html=True,
-    )
+    stack_html = f"""
+    <div style="max-width:480px;margin:0 auto;">
+        <div style="text-align:center;font-size:12px;color:#6B7280;margin-bottom:4px;">
+            ▲ 外側（あとから追加された階層）
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            {''.join(boxes_html)}
+        </div>
+        <div style="text-align:center;font-size:12px;color:#6B7280;margin-top:4px;">
+            ▼ 内側（メール本体）
+        </div>
+    </div>
+    """
+    st.markdown(stack_html, unsafe_allow_html=True)
 
 
 
@@ -516,9 +470,6 @@ def render_single_mode():
     step = st.session_state.step
     info = STEP_INFO[step]
 
-    render_communication_path()
-    st.divider()
-
     col_left, col_right = st.columns(2)
     with col_left:
         if step == 1:
@@ -569,9 +520,6 @@ def render_pair_mode():
     info = STEP_INFO[step]
     sender_active = step <= 6
     receiver_active = step >= 6
-
-    render_communication_path()
-    st.divider()
 
     col_left, col_right = st.columns(2)
 
