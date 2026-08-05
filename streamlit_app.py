@@ -125,7 +125,6 @@ def reset_progress():
     st.session_state.sender_port = DEFAULT_SENDER_PORT
     st.session_state.receiver_port = DEFAULT_RECEIVER_PORT
 
-
 # ============================================================
 # 画面スクロール制御
 # ============================================================
@@ -141,25 +140,42 @@ def scroll_to_top():
     components.html(
         f"""
         <script>
-            function scrollToAnchor() {{
-                try {{
-                    var doc = window.parent.document;
-                    var anchor = doc.getElementById("{SCROLL_ANCHOR_ID}");
-                    if (anchor) {{
-                        anchor.scrollIntoView({{ behavior: "auto", block: "start" }});
-                    }} else {{
-                        window.parent.scrollTo({{ top: 0, behavior: "auto" }});
+            (function() {{
+                function executeScroll() {{
+                    try {{
+                        var doc = window.parent.document;
+                        var anchor = doc.getElementById("{SCROLL_ANCHOR_ID}");
+                        
+                        if (anchor) {{
+                            anchor.scrollIntoView({{ behavior: "instant", block: "start" }});
+                        }} else {{
+                            // Streamlitのメインスクロールコンテナを取得して移動
+                            var container = doc.querySelector('[data-testid="stAppViewContainer"]') || window.parent;
+                            if (container.scrollTo) {{
+                                container.scrollTo({{ top: 0, left: 0, behavior: "instant" }});
+                            }} else {{
+                                container.scrollTop = 0;
+                            }}
+                        }}
+                    }} catch (e) {{
+                        window.scrollTo({{ top: 0, left: 0, behavior: "instant" }});
                     }}
-                }} catch (e) {{
-                    window.scrollTo({{ top: 0, behavior: "auto" }});
                 }}
-            }}
-            setTimeout(scrollToAnchor, 30);
-            setTimeout(scrollToAnchor, 120);
-            setTimeout(scrollToAnchor, 300);
+
+                // DOM描画の更新に合わせて短時間繰り返しスクロールを強制適用
+                var count = 0;
+                var intervalId = setInterval(function() {{
+                    executeScroll();
+                    count++;
+                    if (count >= 10) {{ // 50ms * 10 = 500ms 間監視して終了
+                        clearInterval(intervalId);
+                    }}
+                }}, 50);
+            }})();
         </script>
         """,
         height=0,
+        width=0,
     )
 
 
