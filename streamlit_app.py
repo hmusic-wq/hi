@@ -317,16 +317,55 @@ def render_communication_path():
 # パケット構造（カプセル化）の表示
 # ============================================================
 
+# 各階層の「◯◯層」ラベル（ヘッダ名の前に表示する階層名）
+LAYER_TAB_LABEL = {
+    "app": "アプリケーション層",
+    "tcp": "トランスポート層",
+    "ip": "インターネット層",
+    "ethernet": "ネットワークインターフェース層",
+}
+
+
+def _wrap_layer_box(inner_content_html, layer_key, header_line_html):
+    """1つの階層分の「封筒」を組み立てる。
+    上部に「◯◯層」のタブラベル、その下にヘッダ情報、
+    さらにその内側に一つ内側の階層（inner_content_html）を配置する。
+    層を重ねるたびに padding と margin が加算されるため、
+    外側に行くほど四角い枠が一回り大きく広がって見える。
+    """
+    color = LAYER_COLOR[layer_key]
+    bg = LAYER_BG[layer_key]
+    tab_label = LAYER_TAB_LABEL[layer_key]
+
+    return f"""
+    <div style="position:relative;border:3px solid {color};border-radius:14px;
+                background:{bg};padding:26px 16px 16px 16px;margin-top:18px;">
+        <div style="position:absolute;top:-13px;left:16px;background:{color};
+                    color:#FFFFFF;font-size:11px;font-weight:800;padding:3px 12px;
+                    border-radius:8px;letter-spacing:1px;
+                    box-shadow:0 1px 3px rgba(0,0,0,0.2);">
+            {tab_label}
+        </div>
+        <div style="font-size:12px;font-weight:700;color:{color};margin-bottom:8px;">
+            {header_line_html}
+        </div>
+        {inner_content_html}
+    </div>
+    """
+
+
 def render_packet_box(layers):
     """packet_layers（内側から外側の順）を受け取り、
-    封筒に包まれるようにネストしたHTMLを組み立てて表示する。
+    階層を重ねるごとに枠が外側へ広がっていく「封筒」のイメージで
+    ネストしたHTMLを組み立てて表示する。各層の先頭には
+    「◯◯層」という階層名を、その下に具体的なヘッダ情報を表示する。
     """
     # ユーザー入力はHTMLとして解釈されないようエスケープしてから埋め込む
     safe_subject = html.escape(st.session_state.subject)
     safe_message = html.escape(st.session_state.message).replace("\n", "<br>")
 
-    # 一番内側（メール本体）から順にHTMLを組み立てる
-    inner_html = f"""
+    # 一番内側（メール本体そのもの）
+    content = f"""
     <div style="background:#FFFFFF;border:2px dashed #93C5FD;border-radius:8px;
                 padding:10px;font-size:13px;color:#1E3A8A;">
         ✉️ 件名：{safe_subject}<br>
@@ -334,54 +373,37 @@ def render_packet_box(layers):
     </div>
     """
 
-    # まずメール本体（app）を中心に置き、それ以外の層を外側から順に包む
-    content = inner_html
+    # 内側から外側へ、階層を1つずつ重ねて包んでいく
     for layer in layers:
         if layer == "app":
-            content = f"""
-            <div style="background:{LAYER_BG['app']};border:2px solid {LAYER_COLOR['app']};
-                        border-radius:10px;padding:10px;">
-                <div style="font-size:12px;font-weight:700;color:{LAYER_COLOR['app']};margin-bottom:4px;">
-                    ✉️ メール（アプリケーション層）
-                </div>
-                {content}
-            </div>
-            """
+            header_line = "✉️ メール"
         elif layer == "tcp":
-            content = f"""
-            <div style="background:{LAYER_BG['tcp']};border:2px solid {LAYER_COLOR['tcp']};
-                        border-radius:10px;padding:10px;">
-                <div style="font-size:12px;font-weight:700;color:{LAYER_COLOR['tcp']};margin-bottom:4px;">
-                    🟩 TCPヘッダ（送信元Port:{html.escape(str(st.session_state.sender_port))} / 宛先Port:{html.escape(str(st.session_state.receiver_port))}）
-                </div>
-                {content}
-            </div>
-            """
+            header_line = (
+                f"🟩 TCPヘッダ（送信元Port:{html.escape(str(st.session_state.sender_port))} "
+                f"/ 宛先Port:{html.escape(str(st.session_state.receiver_port))}）"
+            )
         elif layer == "ip":
-            content = f"""
-            <div style="background:{LAYER_BG['ip']};border:2px solid {LAYER_COLOR['ip']};
-                        border-radius:10px;padding:10px;">
-                <div style="font-size:12px;font-weight:700;color:{LAYER_COLOR['ip']};margin-bottom:4px;">
-                    🟧 IPヘッダ（送信元IP:{html.escape(st.session_state.sender_ip)} / 宛先IP:{html.escape(st.session_state.receiver_ip)} / TTL:{st.session_state.ttl}）
-                </div>
-                {content}
-            </div>
-            """
+            header_line = (
+                f"🟧 IPヘッダ（送信元IP:{html.escape(st.session_state.sender_ip)} "
+                f"/ 宛先IP:{html.escape(st.session_state.receiver_ip)} "
+                f"/ TTL:{st.session_state.ttl}）"
+            )
         elif layer == "ethernet":
-            content = f"""
-            <div style="background:{LAYER_BG['ethernet']};border:2px solid {LAYER_COLOR['ethernet']};
-                        border-radius:10px;padding:10px;">
-                <div style="font-size:12px;font-weight:700;color:{LAYER_COLOR['ethernet']};margin-bottom:4px;">
-                    🟥 Ethernetヘッダ（送信元MAC:{html.escape(st.session_state.sender_mac)} / 宛先MAC:{html.escape(st.session_state.receiver_mac)}）
-                </div>
-                {content}
-            </div>
-            """
+            header_line = (
+                f"🟥 Ethernetヘッダ（送信元MAC:{html.escape(st.session_state.sender_mac)} "
+                f"/ 宛先MAC:{html.escape(st.session_state.receiver_mac)}）"
+            )
+        else:
+            continue
+
+        content = _wrap_layer_box(content, layer, header_line)
 
     st.markdown(
-        f'<div style="max-width:520px;margin:0 auto;">{content}</div>',
+        f'<div style="max-width:560px;margin:0 auto;">{content}</div>',
         unsafe_allow_html=True,
     )
+
+
 
 
 # ============================================================
