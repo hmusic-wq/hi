@@ -155,6 +155,10 @@ def reset_progress():
 # （通信経路やタイトルなど）を毎回見られるよう、自動でページ上部へ
 # スクロールさせる。
 
+# ページ上部の目印（タイトルの直前に置く、見えないアンカー要素のID）
+SCROLL_ANCHOR_ID = "protocolayer-top-anchor"
+
+
 def request_scroll_to_top():
     """次の再描画時にページ上部へスクロールするよう予約する。
     ステップを進めるボタンの処理（st.rerun()の直前）で呼び出す。
@@ -163,21 +167,29 @@ def request_scroll_to_top():
 
 
 def scroll_to_top():
-    """ページ上部（Streamlitのメインコンテナ）までスクロールする。
-    高さ0の非表示コンポーネントとしてJavaScriptを埋め込むことで実現する。
+    """タイトル直前に置いたアンカー要素まで確実にスクロールする。
+    Streamlitのスクロール対象コンテナはバージョンによって
+    class名／構造が変わることがあるため、コンテナを直接指定するのではなく、
+    アンカー要素の scrollIntoView() を使うことで、
+    どの階層がスクロールしていても確実にタイトルが見える位置まで移動する。
     """
     components.html(
-        """
+        f"""
         <script>
-            setTimeout(function () {
-                var container = window.parent.document.querySelector(
-                    'section.main div[data-testid="stAppViewContainer"]'
-                ) || window.parent.document.querySelector('section.main');
-                if (container) {
-                    container.scrollTo({ top: 0, behavior: "auto" });
-                }
-                window.parent.scrollTo({ top: 0, behavior: "auto" });
-            }, 30);
+            function scrollToAnchor() {{
+                var doc = window.parent.document;
+                var anchor = doc.getElementById("{SCROLL_ANCHOR_ID}");
+                if (anchor) {{
+                    anchor.scrollIntoView({{ behavior: "auto", block: "start" }});
+                }} else {{
+                    // アンカーが見つからない場合の保険
+                    window.parent.scrollTo({{ top: 0, behavior: "auto" }});
+                }}
+            }}
+            // 描画タイミングのズレに備えて複数回試みる
+            setTimeout(scrollToAnchor, 30);
+            setTimeout(scrollToAnchor, 120);
+            setTimeout(scrollToAnchor, 300);
         </script>
         """,
         height=0,
@@ -227,6 +239,11 @@ def render_sidebar():
 # ============================================================
 
 def render_header():
+    # スクロール先の目印（高さ0の見えない要素）。この直後にタイトルが来る。
+    st.markdown(
+        f'<div id="{SCROLL_ANCHOR_ID}" style="height:0;"></div>',
+        unsafe_allow_html=True,
+    )
     st.title(APP_TITLE)
     st.caption(APP_SUBTITLE)
 
@@ -657,12 +674,12 @@ def main():
 
     init_session_state()
 
-    # 直前の操作でスクロール予約がされていれば、ページ上部へスクロールする
-    if st.session_state.pop("_scroll_to_top", False):
-        scroll_to_top()
-
     render_sidebar()
     render_header()
+
+    # 直前の操作でスクロール予約がされていれば、タイトルが見える位置までスクロールする
+    if st.session_state.pop("_scroll_to_top", False):
+        scroll_to_top()
 
     st.divider()
 
