@@ -1,22 +1,9 @@
-code = '''# -*- coding: utf-8 -*-
-"""
-ProtocoLayer
-============
-高校「情報Ⅰ」向け教材アプリ。
-メール送信を題材に、TCP/IPの4階層モデルにおける
-「カプセル化」と「デカプセル化」を体験的に学習できる。
-
-・外部データベース、Socket通信は一切使用しない。
-・すべての通信は st.session_state を用いた疑似表現である。
-・実装は教材としての可読性を最優先する。
-"""
-
 import html
 import streamlit as st
 import streamlit.components.v1 as components
 
 # ============================================================
-# 定数定義（保守しやすいように一箇所にまとめる）
+# 定数定義
 # ============================================================
 
 APP_TITLE = "📮 ProtocoLayer"
@@ -31,7 +18,6 @@ LEARNING_GOALS = [
     "メールが相手へ届くまでの流れをイメージできること",
 ]
 
-# 初期値（生徒が変更できる）
 DEFAULT_SUBJECT = "文化祭のご案内"
 DEFAULT_BODY = "来週の文化祭にぜひお越しください。"
 DEFAULT_SENDER_IP = "192.168.1.10"
@@ -40,14 +26,13 @@ DEFAULT_SENDER_MAC = "AA:BB:CC:11:22:33"
 DEFAULT_RECEIVER_MAC = "44:55:66:77:88:99"
 DEFAULT_SENDER_PORT = 52134
 DEFAULT_RECEIVER_PORT = 25
-TTL_VALUE = 64  # TTLは固定
+TTL_VALUE = 64
 
-# 階層ごとの色（カプセル化表示の色分け）
 LAYER_COLOR = {
-    "app": "#2563EB",       # アプリケーション層：青
-    "tcp": "#16A34A",       # トランスポート層：緑
-    "ip": "#F97316",        # インターネット層：オレンジ
-    "ethernet": "#DC2626",  # ネットワークインターフェース層：赤
+    "app": "#2563EB",
+    "tcp": "#16A34A",
+    "ip": "#F97316",
+    "ethernet": "#DC2626",
 }
 LAYER_BG = {
     "app": "#DBEAFE",
@@ -56,7 +41,6 @@ LAYER_BG = {
     "ethernet": "#FEE2E2",
 }
 
-# 階層の正式名称
 LAYER_LABEL = {
     "app": "アプリケーション層（SMTP）",
     "tcp": "トランスポート層（TCP）",
@@ -64,7 +48,6 @@ LAYER_LABEL = {
     "ethernet": "ネットワークインターフェース層（Ethernet）",
 }
 
-# クイズの選択肢と各層の正解
 QUIZ_OPTIONS = ["TCP", "IP", "SMTP", "Ethernet"]
 QUIZ_ANSWER = {
     "app": "SMTP",
@@ -81,7 +64,6 @@ QUIZ_LAYER_JP = {
 
 STEP_MAX = 10
 
-# 各STEPのタイトルと、そのSTEPで強調する階層
 STEP_INFO = {
     1: {"title": "STEP1 メール作成", "layer": None},
     2: {"title": "STEP2 アプリケーション層（データ準備）", "layer": "app"},
@@ -103,10 +85,10 @@ STEP_INFO = {
 def init_session_state():
     """アプリ起動時に一度だけ、必要な状態を初期化する。"""
     defaults = {
-        "mode": "pair",              # "pair"（ペア体験） or "single"（ステップ実行）
-        "step": 1,                   # 現在のステップ（1〜10）
-        "show_final": False,         # 最終画面を表示するか
-        "teacher_mode": False,       # 教師モードON/OFF
+        "mode": "pair",
+        "step": 1,
+        "show_final": False,
+        "teacher_mode": False,
         "subject": DEFAULT_SUBJECT,
         "message": DEFAULT_BODY,
         "sender_ip": DEFAULT_SENDER_IP,
@@ -116,11 +98,10 @@ def init_session_state():
         "sender_port": DEFAULT_SENDER_PORT,
         "receiver_port": DEFAULT_RECEIVER_PORT,
         "ttl": TTL_VALUE,
-        # packet_layers: 内側から外側への順。カプセル化が進むほど要素が増える。
         "packet_layers": ["app"],
-        "received_packet": None,     # ペアモードで「送信」された時点のパケット
-        "quiz_result": {},           # 各層のクイズ正誤 {"app": True, ...}
-        "quiz_choice": {},           # 各層で選んだ選択肢
+        "received_packet": None,
+        "quiz_result": {},
+        "quiz_choice": {},
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -128,9 +109,7 @@ def init_session_state():
 
 
 def reset_progress():
-    """学習の進み具合（ステップやパケット状態）だけをリセットする。
-    入力値も初期値に戻す。
-    """
+    """学習の進み具合と入力値を初期化する。"""
     st.session_state.step = 1
     st.session_state.show_final = False
     st.session_state.packet_layers = ["app"]
@@ -155,14 +134,10 @@ SCROLL_ANCHOR_ID = "protocolayer-top-anchor"
 
 
 def request_scroll_to_top():
-    """次の再描画時にページ上部へスクロールするよう予約する。"""
     st.session_state["_scroll_to_top"] = True
 
 
 def scroll_to_top():
-    """タイトル直前に置いたアンカー要素まで安全にスクロールする。
-    iframe内クロスドメイン等でエラーが起きてもアプリがクラッシュしないようtry-catchで保護。
-    """
     components.html(
         f"""
         <script>
@@ -176,7 +151,6 @@ def scroll_to_top():
                         window.parent.scrollTo({{ top: 0, behavior: "auto" }});
                     }}
                 }} catch (e) {{
-                    // クロスドメイン制約等で親Windowにアクセスできない場合の安全対策
                     window.scrollTo({{ top: 0, behavior: "auto" }});
                 }}
             }}
@@ -194,7 +168,6 @@ def scroll_to_top():
 # ============================================================
 
 def render_sidebar():
-    """モード切り替え・リセット・教師モード・解説表示のUIを描画する。"""
     with st.sidebar:
         st.header("⚙️ 設定")
 
@@ -228,7 +201,7 @@ def render_sidebar():
 
 
 # ============================================================
-# ヘッダー（タイトル・学習目標・現在のステップ）
+# ヘッダー
 # ============================================================
 
 def render_header():
@@ -261,7 +234,6 @@ LAYER_TAB_LABEL = {
 
 
 def _build_layer_box(layer_key, header_line_html, body_html=None):
-    """1つの階層分を、独立した四角い箱として組み立てる。"""
     color = LAYER_COLOR[layer_key]
     bg = LAYER_BG[layer_key]
     tab_label = LAYER_TAB_LABEL[layer_key]
@@ -285,9 +257,11 @@ def _build_layer_box(layer_key, header_line_html, body_html=None):
 
 
 def render_packet_box(layers):
-    """packet_layersを受け取り、視覚的に積み重ねて表示する。"""
-    safe_subject = html.escape(st.session_state.subject)
-    safe_message = html.escape(st.session_state.message).replace("\n", "<br>")
+    if not layers:
+        return
+
+    safe_subject = html.escape(str(st.session_state.get("subject", "")))
+    safe_message = html.escape(str(st.session_state.get("message", ""))).replace("\n", "<br>")
 
     mail_body_html = f"""
     <div style="background:#FFFFFF;border:2px dashed #93C5FD;border-radius:8px;
@@ -310,15 +284,15 @@ def render_packet_box(layers):
             boxes_html.append(_build_layer_box("tcp", header_line))
         elif layer == "ip":
             header_line = (
-                f"🟧 IPヘッダ（送信元IP:{html.escape(st.session_state.sender_ip)} "
-                f"/ 宛先IP:{html.escape(st.session_state.receiver_ip)} "
+                f"🟧 IPヘッダ（送信元IP:{html.escape(str(st.session_state.sender_ip))} "
+                f"/ 宛先IP:{html.escape(str(st.session_state.receiver_ip))} "
                 f"/ TTL:{st.session_state.ttl}）"
             )
             boxes_html.append(_build_layer_box("ip", header_line))
         elif layer == "ethernet":
             header_line = (
-                f"🟥 Ethernetヘッダ（送信元MAC:{html.escape(st.session_state.sender_mac)} "
-                f"/ 宛先MAC:{html.escape(st.session_state.receiver_mac)}）"
+                f"🟥 Ethernetヘッダ（送信元MAC:{html.escape(str(st.session_state.sender_mac))} "
+                f"/ 宛先MAC:{html.escape(str(st.session_state.receiver_mac))}）"
             )
             boxes_html.append(_build_layer_box("ethernet", header_line))
 
@@ -343,7 +317,6 @@ def render_packet_box(layers):
 # ============================================================
 
 def render_quiz(layer_key, key_suffix=""):
-    """指定した階層のプロトコル確認クイズを表示し、正否を返す。"""
     correct = QUIZ_ANSWER[layer_key]
     quiz_key = f"quiz_{layer_key}{key_suffix}"
 
@@ -354,7 +327,7 @@ def render_quiz(layer_key, key_suffix=""):
 
     if st.session_state.teacher_mode:
         default_index = QUIZ_OPTIONS.index(correct)
-        choice = st.radio(
+        st.radio(
             "選択肢", QUIZ_OPTIONS, index=default_index,
             key=quiz_key, horizontal=True,
         )
@@ -387,7 +360,6 @@ def render_quiz(layer_key, key_suffix=""):
 # ============================================================
 
 def render_sender_inputs():
-    """送信者側の入力項目（keyで直接session_stateに紐付け）。"""
     st.subheader("📤 送信者")
     st.text_input("件名", key="subject")
     st.text_area("本文", key="message", height=80)
@@ -405,7 +377,6 @@ def render_sender_inputs():
 
 
 def render_receiver_panel(revealed_layers):
-    """受信者側の状態表示。"""
     st.subheader("📥 受信者")
     if revealed_layers is None:
         st.info("まだ何も届いていません。送信を待っています…")
@@ -423,7 +394,6 @@ def render_receiver_panel(revealed_layers):
 # ============================================================
 
 def can_advance():
-    """現在のステップから次に進んでよいかを判定する。"""
     step = st.session_state.step
     info = STEP_INFO[step]
     layer = info["layer"]
@@ -433,7 +403,6 @@ def can_advance():
 
 
 def apply_step_effect(step):
-    """ステップ番号に応じて packet_layers を更新する。"""
     layers = st.session_state.packet_layers
     if step == 3 and "tcp" not in layers:
         layers.append("tcp")
@@ -451,7 +420,6 @@ def apply_step_effect(step):
 
 
 def render_single_mode():
-    """ステップ実行モード（一人学習用）。"""
     step = st.session_state.step
     info = STEP_INFO[step]
 
@@ -473,19 +441,16 @@ def render_single_mode():
     st.markdown("### 📦 現在のパケット構造")
     render_packet_box(st.session_state.packet_layers)
 
-    # クイズ（追加ステップのみ）
     if step in (2, 3, 4, 5):
         render_quiz(info["layer"])
 
     st.divider()
 
-    # ナビゲーション（前へ / 次へ）
     col_back, col_next = st.columns([1, 3])
 
     with col_back:
         if step > 1:
             if st.button("⬅️ 前へ", use_container_width=True):
-                # 直前のステップに戻る際、追加された層を取り除く処理
                 if step == 3 and "tcp" in st.session_state.packet_layers:
                     st.session_state.packet_layers.remove("tcp")
                 elif step == 4 and "ip" in st.session_state.packet_layers:
@@ -524,7 +489,6 @@ def render_single_mode():
 # ============================================================
 
 def render_pair_mode():
-    """1台のPCを2人で交互に操作するモード。"""
     step = st.session_state.step
     info = STEP_INFO[step]
     sender_active = step <= 6
@@ -567,7 +531,6 @@ def render_pair_mode():
 
     st.divider()
 
-    # --- ナビゲーションボタン ---
     nav_left, nav_right = st.columns(2)
 
     with nav_left:
@@ -724,7 +687,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-'''
-with open("app.py", "w", encoding="utf-8") as f:
-    f.write(code)
-print("Code successfully written to app.py")
