@@ -95,14 +95,6 @@ STEP_INFO = {
     10: {"title": "STEP10　メール表示", "layer": "app", "path": "receiver"},
 }
 
-# 各階層で表示する説明文（教師モード等で使用）
-STEP_MESSAGE = {
-    "app": "メールとして送れる形を作ります。",
-    "tcp": "どのアプリへ届けるかを決めます。",
-    "ip": "相手のネットワークまで運びます。",
-    "ethernet": "LAN内で届けるための情報を付けます。",
-}
-
 
 # ============================================================
 # セッション状態の初期化・リセット
@@ -115,7 +107,6 @@ def init_session_state():
         "step": 1,                   # 現在のステップ（1〜10）
         "show_final": False,         # 最終画面を表示するか
         "teacher_mode": False,       # 教師モードON/OFF
-        "show_explanation": True,    # 解説表示ON/OFF
         "subject": DEFAULT_SUBJECT,
         "message": DEFAULT_BODY,
         "sender_ip": DEFAULT_SENDER_IP,
@@ -220,10 +211,6 @@ def render_sidebar():
             "🧑‍🏫 教師モード", value=st.session_state.teacher_mode,
             help="ONにするとクイズの正解があらかじめ選ばれ、確認なしで先へ進めます。"
         )
-        st.session_state.show_explanation = st.toggle(
-            "💡 各階層の解説を表示", value=st.session_state.show_explanation
-        )
-
         st.divider()
 
         if st.button("🔄 最初からやり直す", use_container_width=True):
@@ -257,7 +244,7 @@ def render_header():
 # ============================================================
 
 def render_communication_path():
-    """送信者PC → LAN → ルータ → インターネット → ルータ → LAN → 受信者PC
+    """送信者PC → LAN → ルータ → インターネット
     を横に並べたイラストを表示する。現在のステップに応じて該当区間を強調する。
     インターネット区間は常に色を変えて表示する。
     """
@@ -268,9 +255,6 @@ def render_communication_path():
         ("🔌 LAN", "sender"),
         ("📡 ルータ", "sender"),
         ("🌐 インターネット", "internet"),
-        ("📡 ルータ", "receiver"),
-        ("🔌 LAN", "receiver"),
-        ("💻 受信者PC", "receiver"),
     ]
 
     boxes_html = []
@@ -328,28 +312,29 @@ LAYER_TAB_LABEL = {
 
 def _wrap_layer_box(inner_content_html, layer_key, header_line_html):
     """1つの階層分の「封筒」を組み立てる。
-    上部に「◯◯層」のタブラベル、その下にヘッダ情報、
-    さらにその内側に一つ内側の階層（inner_content_html）を配置する。
-    層を重ねるたびに padding と margin が加算されるため、
-    外側に行くほど四角い枠が一回り大きく広がって見える。
+    外枠（border）を最後まで崩さず、その内側に
+    「◯◯層」のタイトルバー → ヘッダ情報 → 一つ内側の階層 の順に配置する。
+    box-sizing:border-box を指定した上で、内側の階層ほど
+    padding分だけ幅・高さが小さくなるため、
+    外側の枠を保ったまま四角が段々広がっていくように見える。
     """
     color = LAYER_COLOR[layer_key]
     bg = LAYER_BG[layer_key]
     tab_label = LAYER_TAB_LABEL[layer_key]
 
     return f"""
-    <div style="position:relative;border:3px solid {color};border-radius:14px;
-                background:{bg};padding:26px 16px 16px 16px;margin-top:18px;">
-        <div style="position:absolute;top:-13px;left:16px;background:{color};
-                    color:#FFFFFF;font-size:11px;font-weight:800;padding:3px 12px;
-                    border-radius:8px;letter-spacing:1px;
-                    box-shadow:0 1px 3px rgba(0,0,0,0.2);">
+    <div style="box-sizing:border-box;border:3px solid {color};border-radius:12px;
+                background:{bg};margin-top:14px;overflow:hidden;">
+        <div style="background:{color};color:#FFFFFF;font-size:11px;font-weight:800;
+                    letter-spacing:1px;padding:4px 12px;">
             {tab_label}
         </div>
-        <div style="font-size:12px;font-weight:700;color:{color};margin-bottom:8px;">
-            {header_line_html}
+        <div style="box-sizing:border-box;padding:12px 14px 14px 14px;">
+            <div style="font-size:12px;font-weight:700;color:{color};margin-bottom:8px;">
+                {header_line_html}
+            </div>
+            {inner_content_html}
         </div>
-        {inner_content_html}
     </div>
     """
 
@@ -491,24 +476,6 @@ def render_receiver_panel(revealed_layers):
 
 
 # ============================================================
-# ステップごとの説明文
-# ============================================================
-
-def render_layer_explanation(layer_key):
-    if not st.session_state.show_explanation or layer_key is None:
-        return
-    st.markdown(
-        f"""
-        <div style="background:#F0F9FF;border-left:5px solid #0284C7;
-                    padding:10px 14px;border-radius:6px;margin-top:8px;">
-            <b>{LAYER_LABEL[layer_key]}</b><br>{STEP_MESSAGE[layer_key]}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-# ============================================================
 # ステップ実行モード
 # ============================================================
 
@@ -569,9 +536,6 @@ def render_single_mode():
     st.divider()
     st.markdown("### 📦 現在のパケット構造")
     render_packet_box(st.session_state.packet_layers)
-
-    if info["layer"]:
-        render_layer_explanation(info["layer"])
 
     # クイズ（追加ステップのみ）
     if step in (2, 3, 4, 5):
@@ -642,9 +606,6 @@ def render_pair_mode():
         render_packet_box(st.session_state.packet_layers)
     else:
         render_packet_box(st.session_state.received_packet)
-
-    if info["layer"]:
-        render_layer_explanation(info["layer"])
 
     # クイズ（送信側の追加ステップのみ、左側に表示）
     if step in (2, 3, 4, 5):
