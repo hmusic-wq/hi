@@ -125,8 +125,10 @@ def reset_progress():
     st.session_state.sender_port = DEFAULT_SENDER_PORT
     st.session_state.receiver_port = DEFAULT_RECEIVER_PORT
 
+import streamlit as st
+
 # ============================================================
-# 画面スクロール制御
+# 画面スクロール制御（st.markdown による直接スクロール処理）
 # ============================================================
 
 SCROLL_ANCHOR_ID = "protocolayer-top-anchor"
@@ -137,47 +139,52 @@ def request_scroll_to_top():
 
 
 def scroll_to_top():
-    components.html(
+    # components.html ではなく st.markdown を使い、親DOMに直接干渉する
+    st.markdown(
         f"""
-        <script>
+        <img src="x" onerror="
             (function() {{
-                function executeScroll() {{
-                    try {{
-                        var doc = window.parent.document;
-                        var anchor = doc.getElementById("{SCROLL_ANCHOR_ID}");
-                        
-                        if (anchor) {{
-                            anchor.scrollIntoView({{ behavior: "instant", block: "start" }});
-                        }} else {{
-                            // Streamlitのメインスクロールコンテナを取得して移動
-                            var container = doc.querySelector('[data-testid="stAppViewContainer"]') || window.parent;
-                            if (container.scrollTo) {{
-                                container.scrollTo({{ top: 0, left: 0, behavior: "instant" }});
-                            }} else {{
-                                container.scrollTop = 0;
-                            }}
-                        }}
-                    }} catch (e) {{
-                        window.scrollTo({{ top: 0, left: 0, behavior: "instant" }});
+                function forceScrollTop() {{
+                    // 1. アンカー要素へのスクロールを試行
+                    var anchor = document.getElementById('{SCROLL_ANCHOR_ID}');
+                    if (anchor) {{
+                        anchor.scrollIntoView({{ behavior: 'instant', block: 'start' }});
                     }}
+                    
+                    # 2. 考えられるすべてのスクロール対象のscrollTopを強制的に0に指定
+                    window.scrollTo(0, 0);
+                    if (document.documentElement) document.documentElement.scrollTop = 0;
+                    if (document.body) document.body.scrollTop = 0;
+                    
+                    # 3. Streamlit固有の主要コンテナを全てリセット
+                    var selectors = [
+                        '[data-testid=\\"stAppViewContainer\\"]',
+                        '[data-testid=\\"stMain\\"]',
+                        'section.main',
+                        '.main'
+                    ];
+                    selectors.forEach(function(s) {{
+                        var els = document.querySelectorAll(s);
+                        els.forEach(function(el) {{
+                            el.scrollTop = 0;
+                        }});
+                    }});
                 }}
 
-                // DOM描画の更新に合わせて短時間繰り返しスクロールを強制適用
+                // 即時実行 + 描画完了を考慮して短時間連続実行
+                forceScrollTop();
                 var count = 0;
-                var intervalId = setInterval(function() {{
-                    executeScroll();
+                var timer = setInterval(function() {{
+                    forceScrollTop();
                     count++;
-                    if (count >= 10) {{ // 50ms * 10 = 500ms 間監視して終了
-                        clearInterval(intervalId);
-                    }}
+                    if (count >= 10) clearInterval(timer);
                 }}, 50);
             }})();
-        </script>
+            this.remove();
+        " style="display:none;">
         """,
-        height=0,
-        width=0,
+        unsafe_allow_html=True,
     )
-
 
 # ============================================================
 # サイドバー
