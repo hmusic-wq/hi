@@ -13,6 +13,7 @@ ProtocoLayer
 
 import html
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ============================================================
 # 定数定義（保守しやすいように一箇所にまとめる）
@@ -156,6 +157,43 @@ def reset_progress():
 
 
 # ============================================================
+# 画面スクロール制御
+# ============================================================
+# Streamlitは通常、再描画（rerun）してもスクロール位置を保持したままになる。
+# 「次へ」等のボタンでステップが進んだときは、生徒が画面上部
+# （通信経路やタイトルなど）を毎回見られるよう、自動でページ上部へ
+# スクロールさせる。
+
+def request_scroll_to_top():
+    """次の再描画時にページ上部へスクロールするよう予約する。
+    ステップを進めるボタンの処理（st.rerun()の直前）で呼び出す。
+    """
+    st.session_state["_scroll_to_top"] = True
+
+
+def scroll_to_top():
+    """ページ上部（Streamlitのメインコンテナ）までスクロールする。
+    高さ0の非表示コンポーネントとしてJavaScriptを埋め込むことで実現する。
+    """
+    components.html(
+        """
+        <script>
+            setTimeout(function () {
+                var container = window.parent.document.querySelector(
+                    'section.main div[data-testid="stAppViewContainer"]'
+                ) || window.parent.document.querySelector('section.main');
+                if (container) {
+                    container.scrollTo({ top: 0, behavior: "auto" });
+                }
+                window.parent.scrollTo({ top: 0, behavior: "auto" });
+            }, 30);
+        </script>
+        """,
+        height=0,
+    )
+
+
+# ============================================================
 # サイドバー
 # ============================================================
 
@@ -173,6 +211,7 @@ def render_sidebar():
         if mode_label != st.session_state.mode:
             st.session_state.mode = mode_label
             reset_progress()
+            request_scroll_to_top()
             st.rerun()
 
         st.divider()
@@ -189,6 +228,7 @@ def render_sidebar():
 
         if st.button("🔄 最初からやり直す", use_container_width=True):
             reset_progress()
+            request_scroll_to_top()
             st.rerun()
 
         st.divider()
@@ -524,6 +564,7 @@ def render_single_mode():
             st.session_state.step += 1
         else:
             st.session_state.show_final = True
+        request_scroll_to_top()
         st.rerun()
 
     if disabled and step in (2, 3, 4, 5):
@@ -605,6 +646,7 @@ def render_pair_mode():
                 else:
                     apply_step_effect(step + 1)
                     st.session_state.step += 1
+                request_scroll_to_top()
                 st.rerun()
             if disabled:
                 st.caption("👆 クイズに正解すると次へ進めます。")
@@ -613,6 +655,7 @@ def render_pair_mode():
         if step == 6:
             if st.button("📬 受信する", type="primary", use_container_width=True, key="receiver_recv"):
                 st.session_state.step = 7
+                request_scroll_to_top()
                 st.rerun()
         elif 7 <= step <= 9:
             if st.button("次へ（ヘッダを取り外す）➡️", type="primary",
@@ -627,10 +670,12 @@ def render_pair_mode():
                     layers.remove("tcp")
                 st.session_state.received_packet = layers
                 st.session_state.step += 1
+                request_scroll_to_top()
                 st.rerun()
         elif step == 10:
             if st.button("🎉 メールを読む", type="primary", use_container_width=True, key="receiver_final"):
                 st.session_state.show_final = True
+                request_scroll_to_top()
                 st.rerun()
 
 
@@ -664,6 +709,7 @@ def render_final_screen():
     st.divider()
     if st.button("🔁 もう一度挑戦", type="primary", use_container_width=True):
         reset_progress()
+        request_scroll_to_top()
         st.rerun()
 
 
@@ -679,6 +725,11 @@ def main():
     )
 
     init_session_state()
+
+    # 直前の操作でスクロール予約がされていれば、ページ上部へスクロールする
+    if st.session_state.pop("_scroll_to_top", False):
+        scroll_to_top()
+
     render_sidebar()
     render_header()
 
